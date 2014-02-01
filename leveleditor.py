@@ -109,6 +109,7 @@ Settings.drawItems = Settings("draw items", True)
 Settings.drawTileEntities = Settings("draw tile entities", True)
 Settings.drawTileTicks = Settings("draw tile ticks", False)
 Settings.drawUnpopulatedChunks = Settings("draw unpopulated chunks", True)
+Settings.drawSlimeChunks = Settings("draw slime chunks", False)
 Settings.vertexBufferLimit = Settings("vertex buffer limit", 384)
 
 Settings.vsync = Settings("vertical sync", 0)
@@ -1475,6 +1476,8 @@ class LevelEditor(GLViewport):
             col.append(mceutils.CheckBoxLabel("TileTicks", ref=Settings.drawTileTicks.propertyRef()))
             col.append(mceutils.CheckBoxLabel("Unpopulated Chunks", fg_color=renderer.TerrainPopulatedRenderer.color,
                                      ref=Settings.drawUnpopulatedChunks.propertyRef()))
+            col.append(mceutils.CheckBoxLabel("Slime Chunks", fg_color=renderer.SlimeChunksRenderer.color,
+                                     ref=Settings.drawSlimeChunks.propertyRef()))
 
             col.append(mceutils.CheckBoxLabel("Sky", ref=Settings.drawSky.propertyRef()))
             col.append(mceutils.CheckBoxLabel("Fog", ref=Settings.drawFog.propertyRef()))

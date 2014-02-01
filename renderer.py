@@ -493,6 +493,7 @@ class ChunkCalculator (object):
             ItemRenderer,
             TileTicksRenderer,
             TerrainPopulatedRenderer,
+            SlimeChunksRenderer,
             LowDetailBlockRenderer,
             OverheadBlockRenderer,
         ]
@@ -724,7 +725,8 @@ class Layer:
     TileEntities = "TileEntities"
     TileTicks = "TileTicks"
     TerrainPopulated = "TerrainPopulated"
-    AllLayers = (Blocks, Entities, Monsters, Items, TileEntities, TileTicks, TerrainPopulated)
+    SlimeChunks = "SlimeChunks"
+    AllLayers = (Blocks, Entities, Monsters, Items, TileEntities, TileTicks, TerrainPopulated, SlimeChunks)
 
 
 class BlockRenderer(object):
@@ -954,6 +956,70 @@ class TileTicksRenderer(EntityRendererGeneric):
                 self.vertexArrays.append(self._computeVertices([[t[i].value for i in "xyz"] for t in ticks],
                                                                (0xff, 0xff, 0xff, 0x44),
                                                                chunkPosition=chunk.chunkPosition))
+
+        yield
+
+
+class SlimeChunksRenderer(EntityRendererGeneric):
+    layer = Layer.SlimeChunks
+    vertexTemplate = numpy.zeros((6, 4, 6), 'float32')
+    vertexTemplate[_XYZ] = faceVertexTemplates[_XYZ]
+    vertexTemplate[_XYZ] *= (16, 128, 16)
+    color = (55, 215, 75)
+    vertexTemplate.view('uint8')[_RGBA] = color + (72,)
+
+    def drawFaceVertices(self, buf):
+        if 0 == len(buf):
+            return
+        stride = elementByteLength
+
+        GL.glVertexPointer(3, GL.GL_FLOAT, stride, (buf.ravel()))
+        GL.glTexCoordPointer(2, GL.GL_FLOAT, stride, (buf.ravel()[3:]))
+        GL.glColorPointer(4, GL.GL_UNSIGNED_BYTE, stride, (buf.view(dtype=numpy.uint8).ravel()[20:]))
+
+        GL.glDepthMask(False)
+
+        GL.glDisable(GL.GL_CULL_FACE)
+
+        with gl.glEnable(GL.GL_DEPTH_TEST):
+            GL.glDrawArrays(GL.GL_QUADS, 0, len(buf) * 4)
+
+        GL.glEnable(GL.GL_CULL_FACE)
+
+        GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_LINE)
+
+        GL.glLineWidth(1.0)
+        GL.glDrawArrays(GL.GL_QUADS, 0, len(buf) * 4)
+        GL.glLineWidth(2.0)
+        with gl.glEnable(GL.GL_DEPTH_TEST):
+            GL.glDrawArrays(GL.GL_QUADS, 0, len(buf) * 4)
+        GL.glLineWidth(1.0)
+
+        GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_FILL)
+        GL.glDepthMask(True)
+
+    def makeChunkVertices(self, chunk):
+        neighbors = self.chunkCalculator.getNeighboringChunks(chunk)
+
+        def getslime(ch):
+            return getattr(ch, "SlimeChunk", False)
+
+        sc = getslime(chunk)
+        yield
+        if not sc:
+            return
+
+        visibleFaces = [
+            not getslime(neighbors[pymclevel.faces.FaceXIncreasing]),
+            not getslime(neighbors[pymclevel.faces.FaceXDecreasing]),
+            True,
+            True,
+            not getslime(neighbors[pymclevel.faces.FaceZIncreasing]),
+            not getslime(neighbors[pymclevel.faces.FaceZDecreasing]),
+        ]
+        visibleFaces = numpy.array(visibleFaces, dtype='bool')
+        verts = self.vertexTemplate[visibleFaces]
+        self.vertexArrays.append(verts)
 
         yield
 
@@ -2019,6 +2085,7 @@ class MCRenderer(object):
         Settings.drawTileEntities.addObserver(self)
         Settings.drawTileTicks.addObserver(self)
         Settings.drawUnpopulatedChunks.addObserver(self, "drawTerrainPopulated")
+        Settings.drawSlimeChunks.addObserver(self, "drawSlimeChunks")
         Settings.drawMonsters.addObserver(self)
         Settings.drawItems.addObserver(self)
 
@@ -2067,6 +2134,7 @@ class MCRenderer(object):
     drawMonsters = layerProperty(Layer.Monsters)
     drawItems = layerProperty(Layer.Items)
     drawTerrainPopulated = layerProperty(Layer.TerrainPopulated)
+    drawSlimeChunks = layerProperty(Layer.SlimeChunks)
 
     def inSpace(self):
         if self.level is None:
